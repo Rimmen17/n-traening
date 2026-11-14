@@ -107,6 +107,13 @@ td input { min-width: 70px }
 .chip.lower { background: var(--lower-soft); color: var(--lower) }
 td.log-x, th.log-x { width: 1%; padding-left: 0; text-align: right }
 td.log-x button { min-height: 32px; padding: 2px 8px }
+.muted { color: var(--muted); font-size: .88rem }
+td.log-when b { font-weight: 600 }
+select { font: 500 .92rem var(--body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; min-height: 36px; max-width: 150px }
+.toast { flex-wrap: wrap }
+#toast-prog select { max-width: 100% }
+td.log-what { white-space: normal; width: 100% }
+td.log-what select { display: block; margin-top: 6px; width: 100%; max-width: 220px }
 .empty { color: var(--muted); padding: 14px 4px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start }
 @media (max-width: 420px) { .part { min-height: 132px; padding: 14px } .part .days { font-size: 2.2rem }
   .ex-edit, .lbls { grid-template-columns: 1fr 52px 52px 60px 34px } }
@@ -146,12 +153,12 @@ footer { display: flex; justify-content: center }
       <button class="part upper" id="btn-upper" type="button"><span class="name">Overkrop</span><span class="days" id="d-upper">–</span><span class="when" id="w-upper">Ikke trænet endnu</span><span class="tap">Tryk når du har trænet</span></button>
       <button class="part lower" id="btn-lower" type="button"><span class="name">Underkrop</span><span class="days" id="d-lower">–</span><span class="when" id="w-lower">Ikke trænet endnu</span><span class="tap">Tryk når du har trænet</span></button>
     </div>
-    <div class="toast" id="toast" hidden><span id="toast-txt"></span><button class="ghost" id="undo" type="button">Fortryd</button></div>
+    <div class="toast" id="toast" hidden><span id="toast-txt"></span><span id="toast-prog" hidden></span><button class="ghost" id="undo" type="button">Fortryd</button></div>
   </section>
 
   <section aria-labelledby="h-log">
     <div class="sec-head"><h2 id="h-log">Logbog</h2><span class="sync" id="log-month"></span></div>
-    <div class="table-wrap"><table><thead><tr><th>Dato</th><th>Dag</th><th>Tid</th><th>Træning</th><th class="log-x"></th></tr></thead><tbody id="log"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>Dato</th><th>Træning og program</th><th class="log-x"></th></tr></thead><tbody id="log"></tbody></table></div>
     <div class="row"><button type="button" id="log-all" hidden>Vis alle</button></div>
   </section>
 
@@ -263,12 +270,31 @@ footer { display: flex; justify-content: center }
     $("d-" + k).textContent = n === null ? "–" : n === 0 ? "I dag" : n === 1 ? "1 dag" : n + " dage";
     $("w-" + k).textContent = n === null ? "Ikke trænet endnu" : (n === 0 ? "Trænet " : "Sidst: ") + fmtDate(at);
   }
+  // Program on a log row: the id plus its name at the time, so a deleted or renamed program still reads sensibly.
+  const progName = (e) => { const p = S.programs.find((x) => x.id === e.prog); return p ? p.name : (e.progName || ""); };
+  function progSelect(e, id) {
+    const opts = S.programs.map((p) => `<option value="${p.id}"${p.id === e.prog ? " selected" : ""}>${esc(p.name)}</option>`);
+    if (e.prog && !S.programs.some((p) => p.id === e.prog)) opts.unshift(`<option value="${e.prog}" selected>${esc(e.progName || "Slettet program")}</option>`);
+    return `<select id="${id}" data-logprog="${e.id}" aria-label="Program"><option value="">–</option>${opts.join("")}</select>`;
+  }
+  function setProg(entryId, progId) {
+    const e = S.log.find((x) => x.id === entryId); if (!e) return;
+    const p = S.programs.find((x) => x.id === progId);
+    if (p) { e.prog = p.id; e.progName = p.name; } else if (!progId) { delete e.prog; delete e.progName; }
+    save(); renderLog();
+  }
   function logPart(k) {
     const e = { id: uid(), part: k, at: new Date().toISOString() };
+    const prev = S.log.find((x) => x.part === k && x.prog && S.programs.some((p) => p.id === x.prog));   // last program used for this part
+    if (prev) { e.prog = prev.prog; e.progName = progName(prev); }
     S.log.unshift(e); undoState = { id: e.id, k }; save(); renderPart(k); renderLog();
     $("toast-txt").textContent = PART[k] + " registreret i dag"; $("toast").hidden = false;
-    clearTimeout(logPart.t); logPart.t = setTimeout(() => { $("toast").hidden = true; undoState = null; }, 8000);
+    const tp = $("toast-prog");
+    tp.innerHTML = S.programs.length ? progSelect(e, "toast-prog-sel") : ""; tp.hidden = !S.programs.length;
+    const sel = $("toast-prog-sel"); if (sel) sel.onchange = () => { setProg(e.id, sel.value); armToast(); };
+    armToast();
   }
+  function armToast() { clearTimeout(logPart.t); logPart.t = setTimeout(() => { $("toast").hidden = true; undoState = null; }, 10000); }
   $("btn-upper").onclick = () => logPart("upper");
   $("btn-lower").onclick = () => logPart("lower");
   $("undo").onclick = () => {   // removes exactly the row this tap added, however many taps came before
@@ -290,8 +316,10 @@ footer { display: flex; justify-content: center }
       const date = d.toLocaleDateString("da-DK", { day: "numeric", month: "short", year: d.getFullYear() === now.getFullYear() ? undefined : "2-digit" });
       const wd = d.toLocaleDateString("da-DK", { weekday: "short" });
       const tm = d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
-      return `<tr><td>${esc(date)}</td><td>${esc(wd)}</td><td>${esc(tm)}</td><td><span class="chip ${e.part}">${PART[e.part]}</span></td><td class="log-x"><button type="button" class="ghost danger" data-ldel="${e.id}" aria-label="Slet række">${logArmed === e.id ? "Slet?" : "✕"}</button></td></tr>`;
-    }).join("") : '<tr><td colspan="5"><div class="empty"><span>Tryk på Overkrop eller Underkrop, når du har trænet. Hver gang kommer her.</span></div></td></tr>';
+      const prog = S.programs.length || e.prog ? progSelect(e, "lp-" + e.id) : '<span class="muted">–</span>';
+      return `<tr><td class="log-when"><b>${esc(wd)} ${esc(date)}</b><br><span class="muted">${esc(tm)}</span></td><td class="log-what"><span class="chip ${e.part}">${PART[e.part]}</span>${prog}</td><td class="log-x"><button type="button" class="ghost danger" data-ldel="${e.id}" aria-label="Slet række">${logArmed === e.id ? "Slet?" : "✕"}</button></td></tr>`;
+    }).join("") : '<tr><td colspan="3"><div class="empty"><span>Tryk på Overkrop eller Underkrop, når du har trænet. Hver gang kommer her.</span></div></td></tr>';
+    $("log").querySelectorAll("[data-logprog]").forEach((s) => s.onchange = () => setProg(s.dataset.logprog, s.value));
     $("log-all").hidden = S.log.length <= 10;
     $("log-all").textContent = logAll ? "Vis færre" : `Vis alle (${S.log.length})`;
     $("log").querySelectorAll("[data-ldel]").forEach((b) => b.onclick = () => {
@@ -309,7 +337,7 @@ footer { display: flex; justify-content: center }
     const box = $("progs");
     if (!S.programs.length) {
       box.innerHTML = '<div class="card empty"><span>Ingen programmer endnu. Lav et nyt, eller start med to forslag du kan rette i.</span><button type="button" id="seed-prog">Brug forslag</button></div>';
-      $("seed-prog").onclick = () => { S.programs = suggestedPrograms(); save(); renderProgs(); };
+      $("seed-prog").onclick = () => { S.programs = suggestedPrograms(); save(); renderProgs(); renderLog(); };
       return;
     }
     box.innerHTML = S.programs.map((p) => editingProg && editingProg.id === p.id ? progEditHtml(editingProg) : progViewHtml(p)).join("");
@@ -345,9 +373,9 @@ footer { display: flex; justify-content: center }
     let armed = false;
     $("ex-add").onclick = () => { readEdit(); editingProg.exercises.push({ id: uid(), name: "", sets: "3", reps: "10", kg: "", note: "" }); renderProgs(); const r = document.querySelectorAll(".ex-edit"); r[r.length - 1]?.querySelector("input")?.focus(); };
     document.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => { readEdit(); editingProg.exercises.splice(+b.dataset.del, 1); renderProgs(); });
-    $("prog-save").onclick = () => { readEdit(); editingProg.exercises = editingProg.exercises.filter((x) => x.name); const i = S.programs.findIndex((p) => p.id === editingProg.id); if (i < 0) S.programs.unshift(editingProg); else S.programs[i] = editingProg; editingProg = null; save(); renderProgs(); };
+    $("prog-save").onclick = () => { readEdit(); editingProg.exercises = editingProg.exercises.filter((x) => x.name); const i = S.programs.findIndex((p) => p.id === editingProg.id); if (i < 0) S.programs.unshift(editingProg); else S.programs[i] = editingProg; const pe = editingProg; S.log.forEach((e) => { if (e.prog === pe.id) e.progName = pe.name; }); editingProg = null; save(); renderProgs(); renderLog(); };
     $("prog-cancel").onclick = () => { editingProg = null; renderProgs(); };
-    $("prog-del").onclick = () => { if (!armed) { armed = true; $("del-confirm").hidden = false; return; } S.programs = S.programs.filter((p) => p.id !== editingProg.id); editingProg = null; save(); renderProgs(); };
+    $("prog-del").onclick = () => { if (!armed) { armed = true; $("del-confirm").hidden = false; return; } S.programs = S.programs.filter((p) => p.id !== editingProg.id); editingProg = null; save(); renderProgs(); renderLog(); };
   }
   $("new-prog").onclick = () => {
     const p = { id: uid(), name: "Nyt program", exercises: [{ id: uid(), name: "", sets: "3", reps: "10", kg: "", note: "" }] };
