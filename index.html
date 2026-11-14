@@ -112,6 +112,8 @@ td.log-when b { font-weight: 600 }
 select { font: 500 .92rem var(--body); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; min-height: 36px; max-width: 150px }
 .toast { flex-wrap: wrap }
 #toast-prog select { max-width: 100% }
+.log-title { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
+.log-body { display: flex; flex-direction: column; gap: 12px }
 td.log-what { white-space: normal; width: 100% }
 td.log-what select { display: block; margin-top: 6px; width: 100%; max-width: 220px }
 .empty { color: var(--muted); padding: 14px 4px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start }
@@ -157,9 +159,11 @@ footer { display: flex; justify-content: center }
   </section>
 
   <section aria-labelledby="h-log">
-    <div class="sec-head"><h2 id="h-log">Logbog</h2><span class="sync" id="log-month"></span></div>
-    <div class="table-wrap"><table><thead><tr><th>Dato</th><th>Træning og program</th><th class="log-x"></th></tr></thead><tbody id="log"></tbody></table></div>
-    <div class="row"><button type="button" id="log-all" hidden>Vis alle</button></div>
+    <div class="sec-head"><div class="log-title"><h2 id="h-log">Logbog</h2><span class="sync" id="log-month"></span></div><button type="button" id="log-toggle" aria-expanded="true" aria-controls="log-body">Skjul</button></div>
+    <div id="log-body" class="log-body">
+      <div class="table-wrap"><table><thead><tr><th>Dato</th><th>Træning og program</th><th class="log-x"></th></tr></thead><tbody id="log"></tbody></table></div>
+      <div class="row"><button type="button" id="log-all" hidden>Vis alle</button></div>
+    </div>
   </section>
 
   <section aria-labelledby="h-prog">
@@ -331,6 +335,14 @@ footer { display: flex; justify-content: center }
     });
   }
   $("log-all").onclick = () => { logAll = !logAll; renderLog(); };
+  // Minimise: remembered on this phone only (a view choice, not training data)
+  function setLogOpen(open) {
+    $("log-body").hidden = !open; $("log-toggle").textContent = open ? "Skjul" : "Vis";
+    $("log-toggle").setAttribute("aria-expanded", String(open));
+    try { localStorage.setItem("ntraening-log-open", open ? "1" : "0"); } catch (e) {}
+  }
+  $("log-toggle").onclick = () => setLogOpen($("log-body").hidden);
+  try { if (localStorage.getItem("ntraening-log-open") === "0") setLogOpen(false); } catch (e) {}
 
   // ---------- programs ----------
   function renderProgs() {
