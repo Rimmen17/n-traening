@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#F3F5F9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#10141C" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="N Træning">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<title>N Træning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: one phone column; two big body-part buttons up top, programs, then eating checklist and PR table at the bottom */
+:root {
+  --bg: #F3F5F9; --surface: #FFFFFF; --line: #DCE1EA; --fg: #161B26; --muted: #5E687A;
+  --upper: #2D5BE3; --upper-soft: #E4EBFD; --lower: #D9771E; --lower-soft: #FBEBDC;
+  --ok: #1E8E5A; --danger: #C23B3B;
+  --display: "Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10141C; --surface: #181E29; --line: #2A3242; --fg: #E9EDF4; --muted: #98A2B5;
+  --upper: #6E92FF; --upper-soft: #1D2847; --lower: #F09A4A; --lower-soft: #3A2817;
+  --ok: #4CC38A; --danger: #F07171; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #10141C; --surface: #181E29; --line: #2A3242; --fg: #E9EDF4; --muted: #98A2B5;
+  --upper: #6E92FF; --upper-soft: #1D2847; --lower: #F09A4A; --lower-soft: #3A2817;
+  --ok: #4CC38A; --danger: #F07171; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 16px/1.45 var(--body); margin: 0 }
+.wrap { max-width: 640px; margin: 0 auto; padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 28px }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap }
+h1 { font: 700 2.2rem/1 var(--display); letter-spacing: .01em; margin: 0; text-transform: uppercase }
+h2 { font: 700 1.35rem/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 0 }
+.sync { font-size: .8rem; color: var(--muted) }
+section { display: flex; flex-direction: column; gap: 12px }
+.sec-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap }
+.hint { color: var(--muted); font-size: .9rem; margin: 0 }
+button { font: 600 .95rem var(--body); cursor: pointer; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg); padding: 9px 14px; min-height: 42px }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--upper); outline-offset: 2px }
+button.primary { background: var(--fg); color: var(--bg); border-color: var(--fg) }
+button.ghost { background: transparent; border-color: transparent; color: var(--muted); padding: 6px 8px; min-height: 36px }
+button.danger { color: var(--danger) }
+input { font: 500 1rem var(--body); color: var(--fg); background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0 }
+input[type=number] { font-variant-numeric: tabular-nums }
+
+/* body-part buttons */
+.parts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+.part { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 16px;
+  border-radius: 16px; min-height: 150px; border: 2px solid transparent }
+.part.upper { background: var(--upper-soft); border-color: var(--upper) }
+.part.lower { background: var(--lower-soft); border-color: var(--lower) }
+.part .name { font: 700 1.6rem/1 var(--display); text-transform: uppercase }
+.part.upper .name { color: var(--upper) } .part.lower .name { color: var(--lower) }
+.part .days { font: 700 2.6rem/1 var(--display); font-variant-numeric: tabular-nums }
+.part .when { color: var(--muted); font-weight: 500; font-size: .9rem }
+.part .tap { margin-top: auto; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em }
+.toast { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 10px; padding: 6px 6px 6px 12px; font-size: .92rem }
+
+/* programs */
+.prog { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden }
+.prog > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; gap: 8px }
+.prog > summary::-webkit-details-marker { display: none }
+.prog-name { font: 700 1.2rem var(--display); text-transform: uppercase; letter-spacing: .02em }
+.prog-meta { color: var(--muted); font-size: .85rem }
+.prog-body { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px }
+.ex { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--line) }
+.ex b { font-weight: 600 }
+.ex .nums { font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; white-space: nowrap }
+.ex .note { grid-column: 1 / -1; color: var(--muted); font-size: .88rem }
+.ex-edit { display: grid; grid-template-columns: 1fr 64px 64px 72px 36px; gap: 6px; align-items: center }
+.ex-edit .note-in { grid-column: 1 / 5 }
+.lbls { display: grid; grid-template-columns: 1fr 64px 64px 72px 36px; gap: 6px; font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em }
+.row { display: flex; gap: 8px; flex-wrap: wrap }
+
+/* checklist */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 6px 12px }
+.check { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line) }
+.check:last-child { border-bottom: 0 }
+.check input[type=checkbox] { width: 26px; height: 26px; min-height: 0; accent-color: var(--ok); flex: none }
+.check label { flex: 1; min-width: 0; overflow-wrap: anywhere }
+.check.done label { color: var(--muted); text-decoration: line-through }
+.progress { height: 8px; background: var(--line); border-radius: 99px; overflow: hidden }
+.progress > i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .3s }
+.add { display: flex; gap: 8px } .add input { flex: 1 }
+
+/* PR table */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums }
+th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap }
+th { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; font-weight: 600 }
+tr:last-child td { border-bottom: 0 }
+td.ex-name { white-space: normal; font-weight: 600; min-width: 120px }
+td input { min-width: 70px }
+.empty { color: var(--muted); padding: 14px 4px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start }
+@media (max-width: 420px) { .part { min-height: 132px; padding: 14px } .part .days { font-size: 2.2rem }
+  .ex-edit, .lbls { grid-template-columns: 1fr 52px 52px 60px 34px } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important } }
+
+.login { min-height: 80vh; justify-content: center }
+.login-card { display: flex; flex-direction: column; gap: 8px; padding: 18px }
+.login-card label { font-weight: 600; font-size: .9rem }
+.login-card button { margin-top: 8px }
+.err { color: var(--danger); min-height: 1.2em; margin: 0 }
+footer { display: flex; justify-content: center }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px) }
+[hidden] { display: none !important }
+</style>
+</head>
+<body>
+<div class="wrap login" id="login" hidden>
+  <h1>N Træning</h1>
+  <form id="login-form" class="card login-card">
+    <label for="l-name">Navn</label><input id="l-name" autocomplete="username" autocapitalize="words" required>
+    <label for="l-pass">Adgangskode</label><input id="l-pass" type="password" autocomplete="current-password" required>
+    <button type="submit" class="primary" id="login-btn">Log ind</button>
+    <p class="err" id="login-err" role="alert"></p>
+  </form>
+  <p class="hint">Samme navn og adgangskode som på Krarim.</p>
+</div>
+
+<div class="wrap" id="app" hidden>
+  <header>
+    <h1>N Træning</h1>
+    <span class="sync" id="sync">Indlæser…</span>
+  </header>
+
+  <section aria-labelledby="h-train">
+    <div class="sec-head"><h2 id="h-train">Sidst trænet</h2></div>
+    <div class="parts">
+      <button class="part upper" id="btn-upper" type="button"><span class="name">Overkrop</span><span class="days" id="d-upper">–</span><span class="when" id="w-upper">Ikke trænet endnu</span><span class="tap">Tryk når du har trænet</span></button>
+      <button class="part lower" id="btn-lower" type="button"><span class="name">Underkrop</span><span class="days" id="d-lower">–</span><span class="when" id="w-lower">Ikke trænet endnu</span><span class="tap">Tryk når du har trænet</span></button>
+    </div>
+    <div class="toast" id="toast" hidden><span id="toast-txt"></span><button class="ghost" id="undo" type="button">Fortryd</button></div>
+  </section>
+
+  <section aria-labelledby="h-prog">
+    <div class="sec-head"><h2 id="h-prog">Træningsprogrammer</h2><button type="button" id="new-prog">+ Nyt program</button></div>
+    <div id="progs"></div>
+  </section>
+
+  <section aria-labelledby="h-food">
+    <div class="sec-head"><h2 id="h-food">Spise-checkliste</h2><span class="sync" id="food-count"></span></div>
+    <div class="progress" aria-hidden="true"><i id="food-bar"></i></div>
+    <div class="card" id="food"></div>
+    <form class="add" id="food-add"><input id="food-in" placeholder="Nyt punkt, fx Proteinshake" aria-label="Nyt punkt på checklisten"><button type="submit">Tilføj</button></form>
+    <p class="hint">Fluebenene nulstilles hver dag. Punkterne bliver stående.</p>
+  </section>
+
+  <section aria-labelledby="h-pr">
+    <div class="sec-head"><h2 id="h-pr">Personlige rekorder</h2><button type="button" id="pr-edit">Rediger</button></div>
+    <div class="table-wrap"><table><thead><tr><th>Øvelse</th><th>Kg</th><th>Reps</th><th>Dato</th><th class="pr-x" hidden></th></tr></thead><tbody id="pr"></tbody></table></div>
+    <div class="row" id="pr-actions" hidden><button type="button" id="pr-add">+ Ny rekord</button><button type="button" class="primary" id="pr-done">Færdig</button></div>
+  </section>
+  <footer><button type="button" class="ghost" id="logout">Log ud</button></footer>
+</div>
+
+<script type="module">
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const EMPTY = { upper: null, lower: null, programs: [], food: [], foodDay: null, prs: [] };
+  let S = JSON.parse(JSON.stringify(EMPTY));
+  let ref = null, saving = false, dirty = false, timer = null, editingProg = null, prEditing = false, undoState = null;
+  const LS = "ntraening-v1";
+
+  // ---------- storage: Supabase row per person (Krarim project), cached on the phone ----------
+  // Empty supabaseUrl = demo mode on this phone only (for testing before the database exists).
+  const CONFIG = {
+    supabaseUrl: 'https://rdabjsryzearizqbafpu.supabase.co',
+    supabaseAnonKey: 'sb_publishable_WUhWksp7U4qkCj6kh3yZUg_B6AED-Ee',   // publishable key: public by design, the table's rules guard the data
+    loginDomain: 'krarim.example',   // Nicolai logs in with his Krarim name and password
+  };
+  let sb = null, me = null;
+  const lsKey = () => LS + (me ? "-" + me : "");
+  function setSync(t) { $("sync").textContent = t; }
+  function loadLocal() { try { const v = localStorage.getItem(lsKey()); S = Object.assign({}, JSON.parse(JSON.stringify(EMPTY)), v ? JSON.parse(v) : {}); } catch (e) {} }
+  function saveLocal() { try { localStorage.setItem(lsKey(), JSON.stringify(S)); } catch (e) {} }
+  function save() { dirty = true; saveLocal(); clearTimeout(timer); timer = setTimeout(flush, 600); }
+  async function flush() {
+    if (!sb) { setSync("Gemt på denne telefon (demo)"); dirty = false; return; }
+    if (saving) { timer = setTimeout(flush, 400); return; }
+    saving = true; dirty = false; setSync("Gemmer…");
+    const { error } = await sb.from("training_state").upsert({ owner: me, data: JSON.parse(JSON.stringify(S)), updated_at: new Date().toISOString() });
+    saving = false;
+    if (error) { dirty = true; setSync("Ikke gemt online endnu. Prøver igen…"); clearTimeout(timer); timer = setTimeout(flush, 5000); }
+    else setSync("Gemt");
+  }
+  async function pull() {
+    if (!sb || !me || dirty || saving) return;
+    const { data, error } = await sb.from("training_state").select("data").eq("owner", me).maybeSingle();
+    if (error) { setSync("Offline: gemt på telefonen"); return; }
+    if (data) { S = Object.assign({}, JSON.parse(JSON.stringify(EMPTY)), data.data || {}); saveLocal(); setSync("Gemt"); render(); }
+    else if (hasContent(S)) save(); else setSync("Gemt");
+  }
+  const nameToEmail = (n) => String(n).normalize("NFC").trim().toLowerCase().replaceAll("æ", "ae").replaceAll("ø", "oe").replaceAll("å", "aa").replace(/\s+/g, ".") + "@" + CONFIG.loginDomain;
+  async function checkSpace(id) {   // the Krarim project is shared: only Krarim's own accounts belong here
+    const { data } = await sb.from("profiles").select("space").eq("id", id).maybeSingle();
+    if (!data || (data.space && data.space !== CONFIG.loginDomain.split(".")[0])) { await sb.auth.signOut({ scope: "local" }); return false; }
+    return true;
+  }
+  function showApp() { $("login").hidden = true; $("app").hidden = false; loadLocal(); render(); }
+  function showLogin() { $("app").hidden = true; $("login").hidden = false; }
+  async function boot() {
+    if (!CONFIG.supabaseUrl) { $("logout").hidden = true; showApp(); setSync("Demo: gemt på denne telefon"); return; }
+    try {
+      const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm");
+      sb = createClient(CONFIG.supabaseUrl, CONFIG.supabaseAnonKey, { auth: { storageKey: "ntraening-auth", persistSession: true, autoRefreshToken: true } });
+      const { data } = await sb.auth.getSession();
+      if (data.session && await checkSpace(data.session.user.id)) { me = data.session.user.id; showApp(); setSync("Henter…"); pull(); }
+      else showLogin();
+    } catch (e) { $("login-err").textContent = "Kunne ikke forbinde. Tjek internettet og prøv igen."; showLogin(); }
+  }
+  $("login-form").onsubmit = async (e) => {
+    e.preventDefault(); $("login-err").textContent = ""; $("login-btn").disabled = true;
+    const { data, error } = await sb.auth.signInWithPassword({ email: nameToEmail($("l-name").value), password: $("l-pass").value });
+    $("login-btn").disabled = false;
+    if (error || !(await checkSpace(data.user.id))) { $("login-err").textContent = "Forkert navn eller adgangskode"; return; }
+    me = data.user.id; $("l-pass").value = ""; showApp(); setSync("Henter…"); pull();
+  };
+  $("logout").onclick = async () => { if (dirty) await flush(); await sb.auth.signOut(); location.reload(); };
+  const hasContent = (s) => s.upper || s.lower || s.programs.length || s.food.length || s.prs.length;
+
+  // ---------- last trained ----------
+  function daysSince(iso) { if (!iso) return null; const a = new Date(iso); a.setHours(0, 0, 0, 0); const b = new Date(); b.setHours(0, 0, 0, 0); return Math.round((b - a) / 864e5); }
+  function fmtDate(iso) { return new Date(iso).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long" }); }
+  function renderPart(k) {
+    const n = daysSince(S[k]);
+    $("d-" + k).textContent = n === null ? "–" : n === 0 ? "I dag" : n === 1 ? "1 dag" : n + " dage";
+    $("w-" + k).textContent = n === null ? "Ikke trænet endnu" : (n === 0 ? "Trænet " : "Sidst: ") + fmtDate(S[k]);
+  }
+  function logPart(k, label) {
+    undoState = { k, prev: S[k] }; S[k] = new Date().toISOString(); save(); renderPart(k);
+    $("toast-txt").textContent = label + " registreret i dag"; $("toast").hidden = false;
+    clearTimeout(logPart.t); logPart.t = setTimeout(() => { $("toast").hidden = true; undoState = null; }, 8000);
+  }
+  $("btn-upper").onclick = () => logPart("upper", "Overkrop");
+  $("btn-lower").onclick = () => logPart("lower", "Underkrop");
+  $("undo").onclick = () => { if (!undoState) return; S[undoState.k] = undoState.prev; save(); renderPart(undoState.k); $("toast").hidden = true; undoState = null; };
+
+  // ---------- programs ----------
+  function renderProgs() {
+    const box = $("progs");
+    if (!S.programs.length) {
+      box.innerHTML = '<div class="card empty"><span>Ingen programmer endnu. Lav et nyt, eller start med to forslag du kan rette i.</span><button type="button" id="seed-prog">Brug forslag</button></div>';
+      $("seed-prog").onclick = () => { S.programs = suggestedPrograms(); save(); renderProgs(); };
+      return;
+    }
+    box.innerHTML = S.programs.map((p) => editingProg && editingProg.id === p.id ? progEditHtml(editingProg) : progViewHtml(p)).join("");
+    box.style.display = "flex"; box.style.flexDirection = "column"; box.style.gap = "10px";
+    box.querySelectorAll("[data-edit]").forEach((b) => b.onclick = (e) => { e.preventDefault(); editingProg = JSON.parse(JSON.stringify(S.programs.find((p) => p.id === b.dataset.edit))); renderProgs(); });
+    if (editingProg) wireEdit();
+  }
+  function progViewHtml(p) {
+    const ex = p.exercises.length ? p.exercises.map((x) => `<div class="ex"><b>${esc(x.name)}</b><span class="nums">${esc(x.sets || "–")} × ${esc(x.reps || "–")}${x.kg ? " · " + esc(x.kg) + " kg" : ""}</span>${x.note ? `<span class="note">${esc(x.note)}</span>` : ""}</div>`).join("") : '<p class="hint">Ingen øvelser endnu.</p>';
+    return `<details class="prog"><summary><span><span class="prog-name">${esc(p.name)}</span><br><span class="prog-meta">${p.exercises.length} øvelser</span></span><button type="button" data-edit="${p.id}">Rediger</button></summary><div class="prog-body">${ex}</div></details>`;
+  }
+  function progEditHtml(p) {
+    const rows = p.exercises.map((x, i) => `<div class="ex-edit" data-i="${i}">
+      <input id="ex-n-${x.id}" data-f="name" value="${esc(x.name)}" placeholder="Øvelse" aria-label="Øvelse">
+      <input id="ex-s-${x.id}" data-f="sets" value="${esc(x.sets)}" inputmode="numeric" placeholder="Sæt" aria-label="Sæt">
+      <input id="ex-r-${x.id}" data-f="reps" value="${esc(x.reps)}" placeholder="Reps" aria-label="Reps">
+      <input id="ex-k-${x.id}" data-f="kg" value="${esc(x.kg)}" inputmode="decimal" placeholder="Kg" aria-label="Kg">
+      <button type="button" class="ghost danger" data-del="${i}" aria-label="Slet øvelse">✕</button>
+      <input id="ex-o-${x.id}" class="note-in" data-f="note" value="${esc(x.note)}" placeholder="Note (valgfri)" aria-label="Note"></div>`).join("");
+    return `<div class="prog"><div class="prog-body" style="padding-top:16px">
+      <input id="prog-name" value="${esc(p.name)}" placeholder="Programmets navn" aria-label="Programmets navn" style="font:700 1.2rem var(--display);text-transform:uppercase">
+      ${p.exercises.length ? '<div class="lbls"><span>Øvelse</span><span>Sæt</span><span>Reps</span><span>Kg</span><span></span></div>' : ""}
+      ${rows}
+      <div class="row"><button type="button" id="ex-add">+ Øvelse</button></div>
+      <div class="row" style="justify-content:space-between"><div class="row"><button type="button" class="primary" id="prog-save">Gem</button><button type="button" id="prog-cancel">Annuller</button></div><button type="button" class="danger" id="prog-del">Slet program</button></div>
+      <p class="hint" id="del-confirm" hidden>Tryk "Slet program" igen for at slette det for altid.</p></div></div>`;
+  }
+  function readEdit() {
+    editingProg.name = $("prog-name").value.trim() || "Uden navn";
+    document.querySelectorAll(".ex-edit").forEach((row) => { const x = editingProg.exercises[+row.dataset.i]; row.querySelectorAll("[data-f]").forEach((inp) => x[inp.dataset.f] = inp.value.trim()); });
+  }
+  function wireEdit() {
+    let armed = false;
+    $("ex-add").onclick = () => { readEdit(); editingProg.exercises.push({ id: uid(), name: "", sets: "3", reps: "10", kg: "", note: "" }); renderProgs(); const r = document.querySelectorAll(".ex-edit"); r[r.length - 1]?.querySelector("input")?.focus(); };
+    document.querySelectorAll("[data-del]").forEach((b) => b.onclick = () => { readEdit(); editingProg.exercises.splice(+b.dataset.del, 1); renderProgs(); });
+    $("prog-save").onclick = () => { readEdit(); editingProg.exercises = editingProg.exercises.filter((x) => x.name); const i = S.programs.findIndex((p) => p.id === editingProg.id); if (i < 0) S.programs.unshift(editingProg); else S.programs[i] = editingProg; editingProg = null; save(); renderProgs(); };
+    $("prog-cancel").onclick = () => { editingProg = null; renderProgs(); };
+    $("prog-del").onclick = () => { if (!armed) { armed = true; $("del-confirm").hidden = false; return; } S.programs = S.programs.filter((p) => p.id !== editingProg.id); editingProg = null; save(); renderProgs(); };
+  }
+  $("new-prog").onclick = () => {
+    const p = { id: uid(), name: "Nyt program", exercises: [{ id: uid(), name: "", sets: "3", reps: "10", kg: "", note: "" }] };
+    S.programs.unshift(p); editingProg = JSON.parse(JSON.stringify(p)); renderProgs(); $("prog-name").select();
+  };
+  function suggestedPrograms() {
+    const e = (name, sets, reps) => ({ id: uid(), name, sets, reps, kg: "", note: "" });
+    return [
+      { id: uid(), name: "Overkrop (forslag)", exercises: [e("Bænkpres", "3", "8-10"), e("Rows med håndvægt", "3", "10"), e("Skulderpres", "3", "10"), e("Lat pulldown", "3", "10-12"), e("Biceps curl", "2", "12"), e("Triceps pushdown", "2", "12")] },
+      { id: uid(), name: "Underkrop (forslag)", exercises: [e("Squat", "3", "8"), e("Rumænsk dødløft", "3", "10"), e("Benpres", "3", "12"), e("Hip thrust", "3", "10"), e("Lægløft", "3", "15")] }
+    ];
+  }
+
+  // ---------- eating checklist (ticks reset each day) ----------
+  function renderFood() {
+    if (S.foodDay !== today()) { S.food.forEach((f) => f.done = false); S.foodDay = today(); }
+    const box = $("food");
+    if (!S.food.length) {
+      box.innerHTML = '<div class="empty"><span>Tilføj det du vil nå at spise i løbet af dagen.</span><button type="button" id="seed-food">Brug forslag</button></div>';
+      $("seed-food").onclick = () => { S.food = ["Morgenmad", "Frokost", "Snack", "Aftensmad", "2 liter vand", "Protein til hvert måltid"].map((t) => ({ id: uid(), text: t, done: false })); S.foodDay = today(); save(); renderFood(); };
+    } else {
+      box.innerHTML = S.food.map((f) => `<div class="check${f.done ? " done" : ""}"><input type="checkbox" id="f-${f.id}" data-id="${f.id}"${f.done ? " checked" : ""}><label for="f-${f.id}">${esc(f.text)}</label><button type="button" class="ghost danger" data-fdel="${f.id}" aria-label="Slet ${esc(f.text)}">✕</button></div>`).join("");
+      box.querySelectorAll("input[type=checkbox]").forEach((c) => c.onchange = () => { S.food.find((f) => f.id === c.dataset.id).done = c.checked; save(); renderFood(); });
+      box.querySelectorAll("[data-fdel]").forEach((b) => b.onclick = () => { S.food = S.food.filter((f) => f.id !== b.dataset.fdel); save(); renderFood(); });
+    }
+    const done = S.food.filter((f) => f.done).length;
+    $("food-count").textContent = S.food.length ? `${done} af ${S.food.length} i dag` : "";
+    $("food-bar").style.width = S.food.length ? (100 * done / S.food.length) + "%" : "0";
+  }
+  $("food-add").onsubmit = (e) => { e.preventDefault(); const v = $("food-in").value.trim(); if (!v) return; S.food.push({ id: uid(), text: v, done: false }); S.foodDay = today(); $("food-in").value = ""; save(); renderFood(); };
+
+  // ---------- personal records ----------
+  function renderPr() {
+    const tb = $("pr");
+    document.querySelectorAll(".pr-x").forEach((th) => th.hidden = !prEditing);
+    $("pr-actions").hidden = !prEditing; $("pr-edit").hidden = prEditing;
+    if (!S.prs.length && !prEditing) { tb.innerHTML = '<tr><td colspan="4"><div class="empty"><span>Ingen rekorder endnu. Tryk "Rediger" for at skrive din første.</span></div></td></tr>'; return; }
+    tb.innerHTML = S.prs.map((r) => prEditing
+      ? `<tr><td><input id="p-e-${r.id}" data-id="${r.id}" data-f="ex" value="${esc(r.ex)}" placeholder="Øvelse" aria-label="Øvelse"></td><td><input id="p-k-${r.id}" data-id="${r.id}" data-f="kg" value="${esc(r.kg)}" inputmode="decimal" aria-label="Kg"></td><td><input id="p-r-${r.id}" data-id="${r.id}" data-f="reps" value="${esc(r.reps)}" inputmode="numeric" aria-label="Reps"></td><td><input id="p-d-${r.id}" type="date" data-id="${r.id}" data-f="date" value="${esc(r.date)}" aria-label="Dato"></td><td><button type="button" class="ghost danger" data-pdel="${r.id}" aria-label="Slet rekord">✕</button></td></tr>`
+      : `<tr><td class="ex-name">${esc(r.ex)}</td><td>${esc(r.kg || "–")}</td><td>${esc(r.reps || "–")}</td><td>${r.date ? new Date(r.date).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "2-digit" }) : "–"}</td></tr>`).join("");
+    tb.querySelectorAll("input").forEach((inp) => inp.onchange = () => { S.prs.find((r) => r.id === inp.dataset.id)[inp.dataset.f] = inp.value.trim(); save(); });
+    tb.querySelectorAll("[data-pdel]").forEach((b) => b.onclick = () => { S.prs = S.prs.filter((r) => r.id !== b.dataset.pdel); save(); renderPr(); });
+  }
+  $("pr-edit").onclick = () => { prEditing = true; renderPr(); };
+  $("pr-done").onclick = () => { S.prs = S.prs.filter((r) => r.ex); prEditing = false; save(); renderPr(); };
+  $("pr-add").onclick = () => { const r = { id: uid(), ex: "", kg: "", reps: "1", date: today() }; S.prs.push(r); renderPr(); $("p-e-" + r.id).focus(); };
+
+  function render() { renderPart("upper"); renderPart("lower"); if (!editingProg) renderProgs(); renderFood(); if (!prEditing) renderPr(); }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && me !== null) { render(); pull(); } else if (!document.hidden) render(); });
+  boot();
+})();
+</script>
+</body>
+</html>
