@@ -102,6 +102,11 @@ th { font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-s
 tr:last-child td { border-bottom: 0 }
 td.ex-name { white-space: normal; font-weight: 600; min-width: 120px }
 td input { min-width: 70px }
+.chip { display: inline-block; font-weight: 600; font-size: .85rem; padding: 2px 10px; border-radius: 99px }
+.chip.upper { background: var(--upper-soft); color: var(--upper) }
+.chip.lower { background: var(--lower-soft); color: var(--lower) }
+td.log-x, th.log-x { width: 1%; padding-left: 0; text-align: right }
+td.log-x button { min-height: 32px; padding: 2px 8px }
 .empty { color: var(--muted); padding: 14px 4px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start }
 @media (max-width: 420px) { .part { min-height: 132px; padding: 14px } .part .days { font-size: 2.2rem }
   .ex-edit, .lbls { grid-template-columns: 1fr 52px 52px 60px 34px } }
@@ -144,6 +149,12 @@ footer { display: flex; justify-content: center }
     <div class="toast" id="toast" hidden><span id="toast-txt"></span><button class="ghost" id="undo" type="button">Fortryd</button></div>
   </section>
 
+  <section aria-labelledby="h-log">
+    <div class="sec-head"><h2 id="h-log">Logbog</h2><span class="sync" id="log-month"></span></div>
+    <div class="table-wrap"><table><thead><tr><th>Dato</th><th>Dag</th><th>Tid</th><th>Træning</th><th class="log-x"></th></tr></thead><tbody id="log"></tbody></table></div>
+    <div class="row"><button type="button" id="log-all" hidden>Vis alle</button></div>
+  </section>
+
   <section aria-labelledby="h-prog">
     <div class="sec-head"><h2 id="h-prog">Træningsprogrammer</h2><button type="button" id="new-prog">+ Nyt program</button></div>
     <div id="progs"></div>
@@ -171,7 +182,7 @@ footer { display: flex; justify-content: center }
   const uid = () => Math.random().toString(36).slice(2, 10);
   const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const EMPTY = { upper: null, lower: null, programs: [], food: [], foodDay: null, prs: [] };
+  const EMPTY = { upper: null, lower: null, log: [], programs: [], food: [], foodDay: null, prs: [] };
   let S = JSON.parse(JSON.stringify(EMPTY));
   let ref = null, saving = false, dirty = false, timer = null, editingProg = null, prEditing = false, undoState = null;
   const LS = "ntraening-v1";
@@ -231,24 +242,67 @@ footer { display: flex; justify-content: center }
     me = data.user.id; $("l-pass").value = ""; showApp(); setSync("Henter…"); pull();
   };
   $("logout").onclick = async () => { if (dirty) await flush(); await sb.auth.signOut(); location.reload(); };
-  const hasContent = (s) => s.upper || s.lower || s.programs.length || s.food.length || s.prs.length;
+  const hasContent = (s) => s.upper || s.lower || (s.log && s.log.length) || s.programs.length || s.food.length || s.prs.length;
 
   // ---------- last trained ----------
   function daysSince(iso) { if (!iso) return null; const a = new Date(iso); a.setHours(0, 0, 0, 0); const b = new Date(); b.setHours(0, 0, 0, 0); return Math.round((b - a) / 864e5); }
   function fmtDate(iso) { return new Date(iso).toLocaleDateString("da-DK", { weekday: "long", day: "numeric", month: "long" }); }
-  function renderPart(k) {
-    const n = daysSince(S[k]);
-    $("d-" + k).textContent = n === null ? "–" : n === 0 ? "I dag" : n === 1 ? "1 dag" : n + " dage";
-    $("w-" + k).textContent = n === null ? "Ikke trænet endnu" : (n === 0 ? "Trænet " : "Sidst: ") + fmtDate(S[k]);
+  // The logbook (S.log) is the source of truth; S.upper / S.lower mirror the newest entry of each part.
+  const PART = { upper: "Overkrop", lower: "Underkrop" };
+  function normalize() {
+    if (!Array.isArray(S.log)) S.log = [];
+    for (const k of ["upper", "lower"]) {   // older data: a registration made before the logbook becomes its first row
+      if (S[k] && !S.log.some((e) => e.part === k)) S.log.push({ id: uid(), part: k, at: S[k] });
+    }
+    S.log.sort((a, b) => b.at.localeCompare(a.at));
   }
-  function logPart(k, label) {
-    undoState = { k, prev: S[k] }; S[k] = new Date().toISOString(); save(); renderPart(k);
-    $("toast-txt").textContent = label + " registreret i dag"; $("toast").hidden = false;
+  const lastOf = (k) => (S.log.find((e) => e.part === k) || {}).at || null;
+  function renderPart(k) {
+    const at = lastOf(k); S[k] = at;
+    const n = daysSince(at);
+    $("d-" + k).textContent = n === null ? "–" : n === 0 ? "I dag" : n === 1 ? "1 dag" : n + " dage";
+    $("w-" + k).textContent = n === null ? "Ikke trænet endnu" : (n === 0 ? "Trænet " : "Sidst: ") + fmtDate(at);
+  }
+  function logPart(k) {
+    const e = { id: uid(), part: k, at: new Date().toISOString() };
+    S.log.unshift(e); undoState = { id: e.id, k }; save(); renderPart(k); renderLog();
+    $("toast-txt").textContent = PART[k] + " registreret i dag"; $("toast").hidden = false;
     clearTimeout(logPart.t); logPart.t = setTimeout(() => { $("toast").hidden = true; undoState = null; }, 8000);
   }
-  $("btn-upper").onclick = () => logPart("upper", "Overkrop");
-  $("btn-lower").onclick = () => logPart("lower", "Underkrop");
-  $("undo").onclick = () => { if (!undoState) return; S[undoState.k] = undoState.prev; save(); renderPart(undoState.k); $("toast").hidden = true; undoState = null; };
+  $("btn-upper").onclick = () => logPart("upper");
+  $("btn-lower").onclick = () => logPart("lower");
+  $("undo").onclick = () => {   // removes exactly the row this tap added, however many taps came before
+    if (!undoState) return;
+    S.log = S.log.filter((e) => e.id !== undoState.id); save(); renderPart(undoState.k); renderLog();
+    $("toast").hidden = true; undoState = null;
+  };
+
+  // ---------- logbook table ----------
+  let logAll = false, logArmed = null;
+  function renderLog() {
+    const now = new Date(), ym = now.toISOString().slice(0, 7);
+    const month = S.log.filter((e) => { const d = new Date(e.at); return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth(); });
+    const mName = now.toLocaleDateString("da-DK", { month: "long" });
+    $("log-month").textContent = S.log.length ? `${mName[0].toUpperCase() + mName.slice(1)}: ${month.filter((e) => e.part === "upper").length} × overkrop, ${month.filter((e) => e.part === "lower").length} × underkrop` : "";
+    const rows = logAll ? S.log : S.log.slice(0, 10);
+    $("log").innerHTML = rows.length ? rows.map((e) => {
+      const d = new Date(e.at);
+      const date = d.toLocaleDateString("da-DK", { day: "numeric", month: "short", year: d.getFullYear() === now.getFullYear() ? undefined : "2-digit" });
+      const wd = d.toLocaleDateString("da-DK", { weekday: "short" });
+      const tm = d.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit" });
+      return `<tr><td>${esc(date)}</td><td>${esc(wd)}</td><td>${esc(tm)}</td><td><span class="chip ${e.part}">${PART[e.part]}</span></td><td class="log-x"><button type="button" class="ghost danger" data-ldel="${e.id}" aria-label="Slet række">${logArmed === e.id ? "Slet?" : "✕"}</button></td></tr>`;
+    }).join("") : '<tr><td colspan="5"><div class="empty"><span>Tryk på Overkrop eller Underkrop, når du har trænet. Hver gang kommer her.</span></div></td></tr>';
+    $("log-all").hidden = S.log.length <= 10;
+    $("log-all").textContent = logAll ? "Vis færre" : `Vis alle (${S.log.length})`;
+    $("log").querySelectorAll("[data-ldel]").forEach((b) => b.onclick = () => {
+      const id = b.dataset.ldel;
+      if (logArmed !== id) { logArmed = id; renderLog(); return; }
+      const e = S.log.find((x) => x.id === id); S.log = S.log.filter((x) => x.id !== id); logArmed = null;
+      if (undoState && undoState.id === id) { $("toast").hidden = true; undoState = null; }
+      save(); if (e) renderPart(e.part); renderLog();
+    });
+  }
+  $("log-all").onclick = () => { logAll = !logAll; renderLog(); };
 
   // ---------- programs ----------
   function renderProgs() {
@@ -341,7 +395,7 @@ footer { display: flex; justify-content: center }
   $("pr-done").onclick = () => { S.prs = S.prs.filter((r) => r.ex); prEditing = false; save(); renderPr(); };
   $("pr-add").onclick = () => { const r = { id: uid(), ex: "", kg: "", reps: "1", date: today() }; S.prs.push(r); renderPr(); $("p-e-" + r.id).focus(); };
 
-  function render() { renderPart("upper"); renderPart("lower"); if (!editingProg) renderProgs(); renderFood(); if (!prEditing) renderPr(); }
+  function render() { normalize(); renderPart("upper"); renderPart("lower"); renderLog(); if (!editingProg) renderProgs(); renderFood(); if (!prEditing) renderPr(); }
   document.addEventListener("visibilitychange", () => { if (!document.hidden && me !== null) { render(); pull(); } else if (!document.hidden) render(); });
   boot();
 })();
